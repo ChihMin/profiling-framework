@@ -2,16 +2,28 @@
 
 import redis
 import os, sys
+import argparse
+
+parser = argparse.ArgumentParser(description='Profiling database system')
+parser.add_argument('--file', help="profiling file path")
+parser.add_argument('--port', help="redis DB port number")
+args = parser.parse_args()
 
 
-if len(sys.argv) < 2:
+if args.file is None:
     print("Please input filename!")
     exit(-1)
 
-r = redis.Redis()
-filename = sys.argv[1]
+portnumber = 6379
+if args.port is not None:
+    portnumber = int(args.port)
 
-file = open(sys.argv[1], 'r')
+print("Current port number is %s, reading date from redis DB..." % portnumber)
+
+r = redis.Redis(port=portnumber)
+filename = args.file
+
+file = open(filename, 'r')
 while True:
     str = file.readline()
     if len(str) == 0:
@@ -24,7 +36,7 @@ while True:
     
     counts = int(status[3])
     origincounts = r.hget(nodename, eventname)
-    if origincounts.__class__.__name__ != 'NoneType':
+    if origincounts is not None:
         counts = counts + int(origincounts)
 
     r.hset(nodename, 'execname', execname)
