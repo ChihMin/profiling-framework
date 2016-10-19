@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+import socket, sys
+import argparse
+
+def main():
+    parser = argparse.ArgumentParser(description='Profiling server')
+    parser.add_argument('--bind', help='Server IP address binder, default is localhost')
+    parser.add_argument('--port', help='Server port number, default is 10000') 
+    args = parser.parse_args()
+    
+    portnumber = 10000
+    bindaddr = 'localhost'
+    
+    if args.bind is not None:
+        bindaddr = args.bind
+
+    if args.port is not None:
+        portnumber = int(args.port)
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except socket.error, msg:
+        sys.stderr.write("[ERROR] %s\n" % msg[1])
+        sys.exit(1)
+
+    try:
+        sock.connect((bindaddr, portnumber))
+    except socket.error, msg:
+        sys.stderr.write("[ERROR] %s" % msg)
+        exit(1)
+
+    sock.send("Hello I'm client.\n")
+    print sock.recv(1024)
+    sock.close()
+
+if __name__ == "__main__":
+    main()

@@ -2,11 +2,13 @@
 
 from multiprocessing import Process
 from subprocess import call
+import socket
 import time
 import os, sys
 import subprocess
 import redis
 import signal
+import argparse
 
 MAIN_PORT = 2000
 
@@ -44,7 +46,6 @@ def redis_initialize(r):
     portlist = r.keys()
     for port in portlist:
         proc = create_server(port)
-        print("pid = %s" % proc.pid)
 
 def initialize():
     print("Booting redis-DB manager ...")
@@ -54,7 +55,42 @@ def initialize():
     redis_initialize(redis_manager)          # Initialized profiling DB
 
 def main():
+    parser = argparse.ArgumentParser(description='Profiling server')
+    parser.add_argument('--bind', help='Server IP address binder, default is localhost')
+    parser.add_argument('--port', help='Server port number, default is 10000') 
+    args = parser.parse_args()
+
+    portnumber = 10000
+    bindaddr = 'localhost'
+    
+    if args.bind is not None:
+        bindaddr = args.bind
+
+    if args.port is not None:
+        portnumber = int(args.port)
+
     initialize()
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except socket.error, msg:
+        sys.stderr.write("[ERROR] %s\n" % msg[1])
+        sys.exit(-1)
+    
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind((bindaddr, portnumber))
+    sock.listen(100)
+    
+    while True:
+        (csock, adr) = sock.accept()
+        print "Client Info: " , csock, adr
+        msg = csock.recv(1024)
+        if not msg:
+            pass
+        else:
+            print "Client send: " + msg
+            csock.send("Hello I'm Server.\n")
+        csock.close() 
 
 def keyboard_int_handler(signal, frame):
     print("[PID %s] Stop profiling server ..." % os.getpid())
