@@ -9,8 +9,14 @@ import subprocess
 import redis
 import signal
 import argparse
+import json
 
 MAIN_PORT = 2000
+
+'''
+Below constant value is command type
+'''
+SEND_PERF_DATA = 1
 
 def create_redis_server(port):
     if not os.path.exists(port):
@@ -32,7 +38,7 @@ def create_server(port):
     while True:
         try:
             print("Start connecting to port %s ..." % portnumber)
-            time.sleep(2)
+            time.sleep(1)
             r.ping()
         except redis.exceptions.ConnectionError:
             print("Connected to port %s failed, restarting ..." % portnumber)
@@ -53,6 +59,62 @@ def initialize():
     
     redis_manager = redis.Redis(port=MAIN_PORT)
     redis_initialize(redis_manager)          # Initialized profiling DB
+
+def parse_perf_data(manager, msg):
+    perf_data = msg['message']
+    portnumber = msg['port']
+    
+    if manager.get('redis') is None:
+        newredis = redis.Redis(port=portnumber)
+        newredis.bgsave()
+        manager['redis'] = newredis
+    
+    r = manager['redis']  
+
+    status = perf_data.split()
+    nodename = status[6]
+    execname = status[7]
+    eventname = status[4]
+    
+    counts = int(status[3])
+    origincounts = r.hget(nodename, eventname)
+    if origincounts is not None:
+        counts = counts + int(origincounts)
+
+    r.hset(nodename, 'execname', execname)
+    r.hset(nodename, eventname, counts)
+    
+
+def select_task(csock, manager, msg): 
+    '''
+    Initialize function selector in dictionay
+    SEND_PERF_DATA --> parse_perf_data
+    '''
+    selector = dict()
+    selector[SEND_PERF_DATA] = parse_perf_data     
+
+    '''
+    Just call selector for specific function
+    '''
+    selector[msg['command']](manager, msg)
+
+def create_task(csock, adr):
+    manager = dict()
+    csock.settimeout(10)
+
+    while True:
+        msg = csock.recv(1024)
+        if not msg:
+            print("Done! Client %s is closed ..." % csock.getsockname()[0])
+            break
+        elif len(msg) != 0:
+            # print "Client send: " + msg
+            csock.send("ack") # send ack back to client
+            msgdict = json.loads(msg)
+            select_task(csock, manager, msgdict)
+
+    csock.close()
+    sys.exit(0) 
 
 def main():
     parser = argparse.ArgumentParser(description='Profiling server')
@@ -84,13 +146,9 @@ def main():
     while True:
         (csock, adr) = sock.accept()
         print "Client Info: " , csock, adr
-        msg = csock.recv(1024)
-        if not msg:
-            pass
-        else:
-            print "Client send: " + msg
-            csock.send("Hello I'm Server.\n")
-        csock.close() 
+        p = Process(target=create_task, args=(csock, adr,)) 
+        p.start()
+
 
 def keyboard_int_handler(signal, frame):
     print("[PID %s] Stop profiling server ..." % os.getpid())

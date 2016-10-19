@@ -1,7 +1,41 @@
 #!/usr/bin/env python
 
-import socket, sys
+import socket, os, sys
 import argparse
+import json
+
+'''
+Below is command type
+'''
+SEND_PERF_DATA = 1
+
+def send_perf_result(sock, profile):
+    f = open('profiling-result.log', 'r')
+    while True:
+        str = f.readline()
+        if not str:
+            break
+        
+        msg = dict()
+        msg['command'] = SEND_PERF_DATA
+        msg['message'] = str
+        msg['port'] = profile['port']
+         
+        jsonstr = json.dumps(msg)
+        sock.send(jsonstr)
+        feedback = sock.recv(1024) 
+    f.close()
+    print("End of file ...")
+
+def run_on_slave(sock):
+    '''
+    TODO:
+    Below profile data will be dispatched by server...
+    Currently just let profile dictionay be static...
+    '''
+    profile = dict()
+    profile['port'] = 1234 
+    send_perf_result(sock, profile)
 
 def main():
     parser = argparse.ArgumentParser(description='Profiling server')
@@ -29,9 +63,9 @@ def main():
     except socket.error, msg:
         sys.stderr.write("[ERROR] %s" % msg)
         exit(1)
-
-    sock.send("Hello I'm client.\n")
-    print sock.recv(1024)
+    
+    run_on_slave(sock)
+     
     sock.close()
 
 if __name__ == "__main__":
