@@ -67,6 +67,14 @@ def parse_perf_data(manager, msg):
     
     if manager.get('redis') is None:
         newredis = redis.Redis(port=portnumber)
+        try:
+            newredis.ping()
+        except redis.exceptions.ConnectionError:
+            logging.error("[PID %s] Unknown port %s" % (os.getpid(), portnumber))
+            csock = manager['csock']
+            csock.send("Unknown port %s" % (portnumber))
+            sys.exit(-1)
+        
         newredis.bgsave()
         manager['redis'] = newredis
     
@@ -101,7 +109,7 @@ def select_task(csock, manager, msg):
 
 def create_task(csock, adr):
     manager = dict()
-    csock.settimeout(10)
+    manager['csock'] = csock
 
     while True:
         msg = csock.recv(1024)
@@ -110,9 +118,9 @@ def create_task(csock, adr):
             break
         elif len(msg) != 0:
             # print "Client send: " + msg
-            csock.send("ack") # send ack back to client
             msgdict = json.loads(msg)
             select_task(csock, manager, msgdict)
+            csock.send("ack") # send ack back to client
 
     csock.close()
     sys.exit(0) 

@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+from client.profclient import ProfClient
+import socket, os, sys
+import argparse
+import json
+
+parser = argparse.ArgumentParser(description='Profiling server')
+parser.add_argument('--bind', help='Server IP address binder, default is localhost')
+parser.add_argument('--port', help='Server port number, default is 10000') 
+parser.add_argument('--jobid', help='Redis-DB port number')
+args = parser.parse_args()
+
+class CustomClient(ProfClient):
+    def __init__(self, bindaddr, port, jobID):
+        super(CustomClient, self).__init__(bindaddr, port)
+        self.bindaddr = bindaddr 
+        self.port = port
+        self.jobID = jobID
+    
+    """
+    Implement run_on_job(self) method for idendified behavior.
+    return value: command list
+    """ 
+    def run_on_job(self):
+        cmdlist = list()
+        f = open('profiling-result.log', 'r')
+        while True:
+            str = f.readline()
+            if not str:
+                break
+            
+            msg = dict()
+            msg['command'] = self.SEND_PERF_DATA
+            msg['message'] = str
+            msg['port'] = self.jobID
+            cmdlist.append(msg) 
+        
+        f.close()
+        print("End of file ...")
+        return cmdlist
+
+def main():
+    portnumber = 10000
+    bindaddr = 'localhost'
+     
+    if args.bind is not None:
+        bindaddr = args.bind
+
+    if args.port is not None:
+        portnumber = int(args.port)
+    
+    if args.jobid is None:
+        print("Please select job ID ...")
+        sys.exit(1)
+
+    profclient = CustomClient(bindaddr, portnumber, int(args.jobid))
+    profclient.run()    
+
+if __name__ == "__main__":
+    main()
