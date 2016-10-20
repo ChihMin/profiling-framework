@@ -10,6 +10,7 @@ import redis
 import signal
 import argparse
 import json
+import logging
 
 MAIN_PORT = 2000
 
@@ -32,19 +33,19 @@ def create_server(port):
     portnumber = str(port)
     p = Process(target=create_redis_server, args=(portnumber,))
     p.start() 
-    print("Redis server created, [PID]: %s" % p.pid)
+    logging.info("[PID %s] Redis server is created" % p.pid)
     
     r = redis.Redis(port=portnumber)
     while True:
         try:
-            print("Start connecting to port %s ..." % portnumber)
+            logging.info("[PID %s] Start connecting to port %s ..." % (p.pid, portnumber))
             time.sleep(1)
             r.ping()
         except redis.exceptions.ConnectionError:
-            print("Connected to port %s failed, restarting ..." % portnumber)
+            logging.error("[PID %s] Connected to port %s failed, restarting ..." % portnumber)
             pass
         else:
-            print("Connected successfully!")
+            logging.info("Connected successfully!")
             break  
     return p
 
@@ -54,7 +55,7 @@ def redis_initialize(r):
         proc = create_server(port)
 
 def initialize():
-    print("Booting redis-DB manager ...")
+    logging.info("Booting redis-DB manager ...")
     create_server(MAIN_PORT)    # Create redis-server manager
     
     redis_manager = redis.Redis(port=MAIN_PORT)
@@ -105,7 +106,7 @@ def create_task(csock, adr):
     while True:
         msg = csock.recv(1024)
         if not msg:
-            print("Done! Client %s is closed ..." % csock.getsockname()[0])
+            logging.info("Done! Client %s is closed ..." % csock.getsockname()[0])
             break
         elif len(msg) != 0:
             # print "Client send: " + msg
@@ -130,7 +131,8 @@ def main():
 
     if args.port is not None:
         portnumber = int(args.port)
-
+    
+    logging.info("Bind addres is %s, port is %s" % (bindaddr, portnumber)) 
     initialize()
     
     try:
@@ -145,16 +147,17 @@ def main():
     
     while True:
         (csock, adr) = sock.accept()
-        print "Client Info: " , csock, adr
+        logging.info("Client Info: %s" , csock.getsockname())
         p = Process(target=create_task, args=(csock, adr,)) 
         p.start()
 
 
 def keyboard_int_handler(signal, frame):
-    print("[PID %s] Stop profiling server ..." % os.getpid())
+    logging.info("[PID %s] Stop profiling server ..." % os.getpid())
     sys.exit(0)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     signal.signal(signal.SIGINT, keyboard_int_handler)
     main()
         
