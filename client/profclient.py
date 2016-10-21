@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import logging
 import socket, os, sys
 import argparse
 import json
@@ -28,13 +29,15 @@ class ProfClient(object):
             sock.send(jsonstr)
             feedback = sock.recv(1024)
             if feedback != "ack":
-                print("[ERROR] %s" % feedback)
+                logging.error("%s" % feedback)
                 sys.exit(-1) 
 
     def run_on_job(self, sock):
         raise NotImplementedError
 
     def run(self):
+        logging.basicConfig(level=logging.INFO)
+        logging.info("Link to HOST %s, port %s" % (self.bindaddr, self.port))
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except socket.error, msg:

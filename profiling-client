@@ -5,6 +5,7 @@ from subprocess import call
 import socket, os, sys
 import argparse
 import json
+import logging
 
 parser = argparse.ArgumentParser(description='Profiling server')
 parser.add_argument('--bind', help='Server IP address binder, default is localhost')
@@ -40,7 +41,7 @@ class CustomClient(ProfClient):
         
         f.close()
         self.send_data(sock, cmdlist)
-        print("End of file ...")
+        logging.info("End of file ...")
 
 def main():
     portnumber = 10000
