@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from client.profclient import ProfClient
+from subprocess import call
 import socket, os, sys
 import argparse
 import json
@@ -20,9 +21,10 @@ class CustomClient(ProfClient):
     
     """
     Implement run_on_job(self) method for idendified behavior.
+    Use send_data(sock, cmdlist) to send data to server
     return value: command list
     """ 
-    def run_on_job(self):
+    def run_on_job(self, sock):
         cmdlist = list()
         f = open('profiling-result.log', 'r')
         while True:
@@ -37,8 +39,8 @@ class CustomClient(ProfClient):
             cmdlist.append(msg) 
         
         f.close()
+        self.send_data(sock, cmdlist)
         print("End of file ...")
-        return cmdlist
 
 def main():
     portnumber = 10000

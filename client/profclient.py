@@ -22,7 +22,7 @@ class ProfClient(object):
         self.bindaddr = bindaddr
         self.port = port
 
-    def send_result(self, sock, cmdlist):
+    def send_data(self, sock, cmdlist):
         for msg in cmdlist:
             jsonstr = json.dumps(msg)
             sock.send(jsonstr)
@@ -31,16 +31,7 @@ class ProfClient(object):
                 print("[ERROR] %s" % feedback)
                 sys.exit(-1) 
 
-    def run_on_slave(self, sock):
-        '''
-        TODO:
-        Below profile data will be dispatched by server...
-        Currently just let profile dictionay be static...
-        '''
-        cmdlist = self.run_on_job()
-        self.send_result(sock, cmdlist)
-     
-    def run_on_job(self):
+    def run_on_job(self, sock):
         raise NotImplementedError
 
     def run(self):
@@ -56,7 +47,7 @@ class ProfClient(object):
             sys.stderr.write("[ERROR] %s" % msg)
             exit(1)
         
-        self.run_on_slave(sock)
+        self.run_on_job(sock)
         sock.close()
 
 def main():
