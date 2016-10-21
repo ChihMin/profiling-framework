@@ -2,10 +2,12 @@
 
 from client.profclient import ProfClient
 from subprocess import call
+from glob import glob
 import socket, os, sys
+import subprocess
 import argparse
-import json
 import logging
+import json
 
 parser = argparse.ArgumentParser(description='Profiling server')
 parser.add_argument('--bind', help='Server IP address binder, default is localhost')
@@ -24,10 +26,53 @@ class CustomClient(ProfClient):
     Implement run_on_job(self) method for idendified behavior.
     Use send_data(sock, cmdlist) to send data to server
     return value: command list
-    """ 
+    command format: key, value
+    
+    NOTICE: msg['command'] = XXX must be added to msg dict() object
+            Farthermore, XXX must be idendified in server side
+    """
     def run_on_job(self, sock):
+        origindir = os.getcwd()
+        eventlist = ['cache-misses:u', 'branch-misses:u', 'cpu-cycles:u']
+        program = "/home/chihmin/llvm-develop/llvm/build/bin/clang++"
+
+        f = open("/home/chihmin/llvm-develop/llvm/build/test.log", "r")
+        while True:
+            str = f.readline()
+            if not str:
+                break
+            
+            cmd = str.split()
+            targetdir = cmd[1]
+            args = " ".join(['-O3'] + cmd[3:])
+
+            os.chdir(targetdir)
+            self.run_profiling(sock, program, eventlist, args) 
+            os.chdir(origindir)
+             
+        f.close()
+    
+    def run_profiling(self, sock, program, eventlist, args):
+        reportname = "profiling-result.log"
+        events = ",".join(eventlist)
+        recordcmd = ("perf record -e %s %s %s" % (events, program, args)).split()
+        reportcmd = ("perf script").split()
+        
+        returncode = call(recordcmd, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+        if returncode != 0:
+            logging.error("Execute Perf Error, please check if it's used SUDO or not")
+            sys.exit(-1)
+
+        with open(reportname, "w") as f:
+            call(reportcmd, stdout=f)
+        self.parse_prof_report(sock, reportname)
+        
+        for filename in glob("perf.*"):
+            os.remove(filename)
+
+    def parse_prof_report(self, sock, reportname):
         cmdlist = list()
-        f = open('profiling-result.log', 'r')
+        f = open(reportname, 'r')
         while True:
             str = f.readline()
             if not str:
@@ -42,6 +87,7 @@ class CustomClient(ProfClient):
         f.close()
         self.send_data(sock, cmdlist)
         logging.info("End of file ...")
+
 
 def main():
     portnumber = 10000
