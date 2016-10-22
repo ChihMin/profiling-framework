@@ -20,6 +20,12 @@ class ProfServer(object):
     '''
     SEND_PERF_DATA = 1
     SEND_BENCHMARK_DATA = 2
+    CREATE_JOB = 3
+    REMOVE_JOB = 4
+    SHOW_ALL_JOB = 5
+    SHOW_JOB_INFO = 6
+    SHOW_JOB_BENCHMARK = 7
+    SHOW_JOB_PROFILING = 8
     
     def __init__(self, bindaddr, portnumber):
         self.bindaddr = bindaddr
@@ -109,6 +115,7 @@ class ProfServer(object):
         benchmark_data = msg['message']
         portnumber = msg['port']
         
+        csock = manager['csock']  
         mainredis = manager['mainredis']
         try:
             mainredis.ping()
@@ -118,9 +125,35 @@ class ProfServer(object):
             csock.send("MAIN PORT IS DEAD!")
             sys.exit(-1)
         
-        bench_counts = int(mainredis.hget(portnumber, 'benchmark'))
-        mainredis.hset(portnumber, bench_counts, benchmark_data)
-        mainredis.hset(portnumber, 'benchmark', bench_counts + 1)
+        if len(mainredis.hgetall(portnumber)) == 0:
+            logging.error("[PID %s] Cannot find Job %s!" % (os.getpid(), portnumber))
+            csock.send("Cannot find Job %s!" % (portnumber))
+            sys.exit(-1)
+        else:
+            bench_counts = int(mainredis.hget(portnumber, 'benchmark'))
+            mainredis.hset(portnumber, bench_counts, benchmark_data)
+            mainredis.hset(portnumber, 'benchmark', bench_counts + 1)
+    
+    def remove_job(self, manager, msg):
+        r = manager['mainredis']
+        csock = manager['csock']
+        
+        try:
+            r.ping()
+        except redis.exceptions.ConnectionError:
+            logging.error("[PID %s] MAIN port is dead ..." % (os.getpid()))
+            csock = manager['csock']
+            csock.send("MAIN PORT IS DEAD!")
+            sys.exit(-1)
+
+        get_keys = r.keys(msg['jobid'])
+        if len(get_keys) != 0:
+            r.delete(msg['jobid'])
+            csock.send("Delete [JOB %s] successfully!" % msg['jobid'])
+        else:
+            csock.send("Cannot find [JOB %s] Orz...." % msg['jobid'])
+            
+        
 
     def select_task(self, csock, manager, msg): 
         '''
@@ -130,11 +163,13 @@ class ProfServer(object):
         selector = dict()
         selector[ProfServer.SEND_PERF_DATA] = self.parse_perf_data
         selector[ProfServer.SEND_BENCHMARK_DATA] = self.parse_benchmark_data
-
+        selector[ProfServer.REMOVE_JOB] = self.remove_job
+        
         '''
         Just call selector for specific function
         '''
-        selector[msg['command']](manager, msg)
+        idx = msg['command']
+        selector[idx](manager, msg)
 
     def create_task(self, csock, adr):
         mainredis = redis.Redis(port=ProfServer.MAIN_PORT)
@@ -150,10 +185,10 @@ class ProfServer(object):
                 logging.info("Done! Client %s is closed ..." % csock.getsockname()[0])
                 break
             elif len(msg) != 0:
-                # print "Client send: " + msg
+                csock.send("ack") # send ack back to client
+                print "Client send: " + msg
                 msgdict = json.loads(msg)
                 self.select_task(csock, manager, msgdict)
-                csock.send("ack") # send ack back to client
 
         csock.close()
         sys.exit(0) 
@@ -173,7 +208,7 @@ class ProfServer(object):
         
         while True:
             (csock, adr) = sock.accept()
-            logging.info("Client Info: %s" , csock.getsockname())
+            logging.info("Client Info: %s", csock.getsockname())
             p = Process(target=self.create_task, args=(csock, adr,)) 
             p.start()
 

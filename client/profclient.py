@@ -19,7 +19,13 @@ class ProfClient(object):
     '''
     SEND_PERF_DATA = 1
     SEND_BENCHMARK_DATA = 2
-    
+    CREATE_JOB = 3
+    REMOVE_JOB = 4
+    SHOW_ALL_JOB = 5
+    SHOW_JOB_INFO = 6
+    SHOW_JOB_BENCHMARK = 7
+    SHOW_JOB_PROFILING = 8
+     
     def __init__(self, bindaddr, port):
         self.bindaddr = bindaddr
         self.port = port

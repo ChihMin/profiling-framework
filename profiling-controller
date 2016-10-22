@@ -1,0 +1,102 @@
+#!/usr/bin/env python
+
+from client.profclient import ProfClient
+from subprocess import call
+from glob import glob
+import socket, os, sys
+import subprocess
+import argparse
+import logging
+import json
+
+parser = argparse.ArgumentParser(description='Profiling server')
+parser.add_argument('--bind', help='Server IP address binder, default is localhost')
+parser.add_argument('--port', help='Server port number, default is 10000') 
+parser.add_argument('--jobid', help='Choose job ID while creating job')
+parser.add_argument('--cmd', help='Profiling Server Command: CREATE, REMOVE')
+parser.add_argument('--info', help='While creating new job, --info should be specific')
+args = parser.parse_args()
+
+class CustomClient(ProfClient):
+    COMMAND_TABLE = {
+        "CREATE": ProfClient.CREATE_JOB,
+        "REMOVE": ProfClient.REMOVE_JOB,
+        "LIST": ProfClient.SHOW_ALL_JOB,
+        "SHOW_JOB_INFO": ProfClient.SHOW_JOB_INFO,
+        "SHOW_JOB_BENCHMARK": ProfClient.SHOW_JOB_BENCHMARK,
+        "SHOW_JOB_PROFILING": ProfClient.SHOW_JOB_PROFILING
+    }
+
+    def __init__(self, bindaddr, port, command):
+        super(CustomClient, self).__init__(bindaddr, port)
+        self.bindaddr = bindaddr 
+        self.port = port
+        self.command = command
+        
+        if command['cmd'] is None:
+            logging.error("Please input remote command: --cmd [CREATE] [REMOVE]")
+            sys.exit(-1)
+        elif command['cmd'] == 'CREATE':
+            if not command['info'] or not command['jobid']:
+                logging.error("If you input 'CREATE' command, please input decription. Use --info [INFO] and --jobid [JOB ID]")
+                sys.exit(-1)
+        elif command['cmd'] == 'REMOVE':
+            if not command['jobid']:
+                logging.error("If you input 'REMOVE' command, please input decription. Use --jobid [JOB ID]")
+                sys.exit(-1)
+        elif command['cmd'] == 'SHOW_JOB_INFO':
+            if not command['jobid']:
+                logging.error("'SHOW_JOB_INFO' command should input JobID. Use --jobid [JOB ID]")
+                sys.exit(-1)
+        elif command['cmd'] == 'SHOW_JOB_BENCHMARK':
+            if not command['jobid']:
+                logging.error("'SHOW_JOB_BENCHMARK' command should input JobID. Use --jobid [JOB ID]")
+                sys.exit(-1)
+        elif command['cmd'] == 'SHOW_JOB_PROFILING':
+            if not command['jobid']:
+                logging.error("'SHOW_JOB_PROFILING' command should input JobID. Use --jobid [JOB ID]")
+                sys.exit(-1)
+    
+        self.command['command'] = CustomClient.COMMAND_TABLE[command['cmd']]
+    
+    """
+    Implement run_on_job(self) method for idendified behavior.
+    Use send_data(sock, cmdlist) to send data to server
+    return value: command list
+    command format: key, value
+    
+    NOTICE: msg['command'] = XXX must be added to msg dict() object
+            Farthermore, XXX must be idendified in server side
+    """
+    def run_on_job(self, sock):
+        print(self.command)
+        """
+        for key in self.command:
+            if self.command[key] is None:
+                self.command[key] = "null"
+        """
+
+        self.send_data(sock, [self.command])
+        returnmsg = sock.recv(1024)
+        logging.info(returnmsg)
+
+def main():
+    portnumber = 10000
+    bindaddr = 'localhost'
+     
+    if args.bind is not None:
+        bindaddr = args.bind
+
+    if args.port is not None:
+        portnumber = int(args.port)
+    
+    command = dict()
+    command['cmd'] = args.cmd
+    command['info'] = args.info
+    command['jobid'] = args.jobid
+    
+    profclient = CustomClient(bindaddr, portnumber, command)
+    profclient.run()    
+
+if __name__ == "__main__":
+    main()
