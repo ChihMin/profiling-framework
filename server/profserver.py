@@ -19,6 +19,7 @@ class ProfServer(object):
     Below constant value is command type
     '''
     SEND_PERF_DATA = 1
+    SEND_BENCHMARK_DATA = 2
     
     def __init__(self, bindaddr, portnumber):
         self.bindaddr = bindaddr
@@ -65,8 +66,8 @@ class ProfServer(object):
         
         redis_manager = redis.Redis(port=ProfServer.MAIN_PORT)
         self.redis_initialize(redis_manager)          # Initialized profiling DB
-
-    def parse_perf_data(self, manager, msg):
+    
+    def update_redis_manager(self, manager, msg):
         perf_data = msg['message']
         portnumber = msg['port']
         
@@ -83,6 +84,12 @@ class ProfServer(object):
             newredis.bgsave()
             manager['redis'] = newredis
         
+
+    def parse_perf_data(self, manager, msg):
+        self.update_redis_manager(manager, msg)
+        
+        perf_data = msg['message']
+        portnumber = msg['port']
         r = manager['redis']  
 
         status = perf_data.split()
@@ -98,6 +105,22 @@ class ProfServer(object):
         r.hset(nodename, 'execname', execname)
         r.hset(nodename, eventname, counts)
         
+    def parse_benchmark_data(self, manager, msg):
+        benchmark_data = msg['message']
+        portnumber = msg['port']
+        
+        mainredis = manager['mainredis']
+        try:
+            mainredis.ping()
+        except redis.exceptions.ConnectionError:
+            logging.error("[PID %s] MAIN port is dead ..." % (os.getpid()))
+            csock = manager['csock']
+            csock.send("MAIN PORT IS DEAD!")
+            sys.exit(-1)
+        
+        bench_counts = int(mainredis.hget(portnumber, 'benchmark'))
+        mainredis.hset(portnumber, bench_counts, benchmark_data)
+        mainredis.hset(portnumber, 'benchmark', bench_counts + 1)
 
     def select_task(self, csock, manager, msg): 
         '''
@@ -105,7 +128,8 @@ class ProfServer(object):
         SEND_PERF_DATA --> parse_perf_data
         '''
         selector = dict()
-        selector[ProfServer.SEND_PERF_DATA] = self.parse_perf_data     
+        selector[ProfServer.SEND_PERF_DATA] = self.parse_perf_data
+        selector[ProfServer.SEND_BENCHMARK_DATA] = self.parse_benchmark_data
 
         '''
         Just call selector for specific function
@@ -113,8 +137,12 @@ class ProfServer(object):
         selector[msg['command']](manager, msg)
 
     def create_task(self, csock, adr):
+        mainredis = redis.Redis(port=ProfServer.MAIN_PORT)
+        mainredis.bgsave()
+        
         manager = dict()
         manager['csock'] = csock
+        manager['mainredis'] = mainredis
 
         while True:
             msg = csock.recv(1024)

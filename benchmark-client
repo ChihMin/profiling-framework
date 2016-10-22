@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+
+from client.profclient import ProfClient
+from subprocess import call
+from glob import glob
+from time import clock
+import socket, os, sys
+import subprocess
+import argparse
+import logging
+import json
+
+parser = argparse.ArgumentParser(description='Profiling server')
+parser.add_argument('--bind', help='Server IP address binder, default is localhost')
+parser.add_argument('--port', help='Server port number, default is 10000') 
+parser.add_argument('--jobid', help='Redis-DB port number')
+args = parser.parse_args()
+
+class CustomClient(ProfClient):
+    def __init__(self, bindaddr, port, jobID):
+        super(CustomClient, self).__init__(bindaddr, port)
+        self.bindaddr = bindaddr 
+        self.port = port
+        self.jobID = jobID
+    
+    """
+    Implement run_on_job(self) method for idendified behavior.
+    Use send_data(sock, cmdlist) to send data to server
+    return value: command list
+    command format: key, value
+    
+    NOTICE: msg['command'] = XXX must be added to msg dict() object
+            Farthermore, XXX must be idendified in server side
+    """
+    def run_on_job(self, sock):
+        origindir = os.getcwd()
+        eventlist = ['cache-misses:u', 'branch-misses:u', 'cpu-cycles:u', 'L1-icache-load-misses', 'context-switches']
+        program = "/home/chihmin/llvm-develop/llvm/build/bin/clang++"
+
+        f = open("/home/chihmin/llvm-develop/llvm/build/test.log", "r")
+        while True:
+            str = f.readline()
+            if not str:
+                break
+            
+            cmd = str.split()
+            targetdir = cmd[1]
+            args = " ".join(['-O3'] + cmd[3:])
+
+            os.chdir(targetdir)
+            self.run_benchmark(sock, program, eventlist, args) 
+            os.chdir(origindir)
+             
+        f.close()
+    
+    def run_benchmark(self, sock, program, eventlist, args):
+        cmdlist = list()
+        events = ",".join(eventlist)
+        recordcmd = ("perf stat -e %s %s %s" % (events, program, args)).split()
+        timingcmd = ("time %s %s" % (program, args)).split()
+        proc = subprocess.Popen(
+            recordcmd,
+            stdout = subprocess.PIPE,
+            stderr = subprocess.PIPE
+        )
+        (out, err) = proc.communicate()
+        if proc.returncode != 0:
+            logging.error("Execute Perf Error, please check if it's used SUDO or not")
+            sys.exit(-1)
+        
+        benchmark_report = err.split()
+        report = dict()
+        for event in eventlist:
+            countidx = benchmark_report.index(event)
+            counts = benchmark_report[countidx - 1]
+            report[event] = counts
+        
+        timeidx = benchmark_report.index('seconds')
+        report['time'] = benchmark_report[timeidx - 1]
+        print(report)
+        """ 
+        print(benchmark_report[-6:-1])
+        timeproc = subprocess.Popen(
+            timingcmd, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE
+        )
+        (out, err) = timeproc.communicate()
+        print(err)
+        """    
+     
+        msg = dict()
+        msg['command'] = self.SEND_BENCHMARK_DATA
+        msg['message'] = json.dumps(report)
+        msg['port'] = self.jobID
+
+        cmdlist.append(msg)
+        self.send_data(sock, cmdlist)
+        logging.info("Run benchmark complete ...")
+        
+    def parse_prof_report(self, sock, reportname):
+        cmdlist = list()
+        f = open(reportname, 'r')
+        while True:
+            str = f.readline()
+            if not str:
+                break
+            
+            msg = dict()
+            msg['command'] = self.SEND_PERF_DATA
+            msg['message'] = str
+            msg['port'] = self.jobID
+            cmdlist.append(msg) 
+        
+        f.close()
+        self.send_data(sock, cmdlist)
+        logging.info("End of file ...")
+
+
+def main():
+    portnumber = 10000
+    bindaddr = 'localhost'
+     
+    if args.bind is not None:
+        bindaddr = args.bind
+
+    if args.port is not None:
+        portnumber = int(args.port)
+    
+    if args.jobid is None:
+        print("Please select job ID ...")
+        sys.exit(1)
+
+    profclient = CustomClient(bindaddr, portnumber, int(args.jobid))
+    profclient.run()    
+
+if __name__ == "__main__":
+    main()

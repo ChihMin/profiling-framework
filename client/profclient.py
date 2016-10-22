@@ -18,6 +18,7 @@ class ProfClient(object):
     Below is command type
     '''
     SEND_PERF_DATA = 1
+    SEND_BENCHMARK_DATA = 2
     
     def __init__(self, bindaddr, port):
         self.bindaddr = bindaddr
