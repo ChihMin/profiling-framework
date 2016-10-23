@@ -12,8 +12,9 @@ import json
 parser = argparse.ArgumentParser(description='Profiling server')
 parser.add_argument('--bind', help='Server IP address binder, default is localhost')
 parser.add_argument('--port', help='Server port number, default is 10000') 
-parser.add_argument('--jobid', help='Choose job ID while creating job')
-parser.add_argument('--cmd', help='Profiling Server Command: CREATE, REMOVE')
+parser.add_argument('--jobid', help='Choose job ID while creating job, jobID range should be from 2001 ~ 9999')
+parser.add_argument('--cmd', help='Profiling Server Command: [CREATE] [REMOVE] [LIST] \
+                                    [SHOW_JOB_INFO] [SHOW_JOB_BENCHMARK]')
 parser.add_argument('--info', help='While creating new job, --info should be specific')
 args = parser.parse_args()
 
@@ -34,7 +35,7 @@ class CustomClient(ProfClient):
         self.command = command
         
         if command['cmd'] is None:
-            logging.error("Please input remote command: --cmd [CREATE] [REMOVE]")
+            logging.error("Please use '--help' to see more information")
             sys.exit(-1)
         elif command['cmd'] == 'CREATE':
             if not command['info'] or not command['jobid']:
@@ -56,8 +57,11 @@ class CustomClient(ProfClient):
             if not command['jobid']:
                 logging.error("'SHOW_JOB_PROFILING' command should input JobID. Use --jobid [JOB ID]")
                 sys.exit(-1)
-    
-        self.command['command'] = CustomClient.COMMAND_TABLE[command['cmd']]
+        try: 
+            self.command['command'] = CustomClient.COMMAND_TABLE[command['cmd']]
+        except KeyError:
+            logging.error("Command '%s' is not defined ..." % command['cmd'])
+            sys.exit(-1)
     
     """
     Implement run_on_job(self) method for idendified behavior.

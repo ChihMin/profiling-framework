@@ -4,7 +4,7 @@ from multiprocessing import Process
 from subprocess import call
 import socket
 import time
-import os, sys
+import os, sys, signal
 import subprocess
 import redis
 import signal
@@ -38,14 +38,21 @@ class ProfServer(object):
         orgin_path = os.getcwd()
         os.chdir(port)
         cmds = ["redis-server", "--port", port]
-        ret = call(cmds, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT) 
+        proc = subprocess.Popen(cmds, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+         
+        logging.info("[PID %s] Redis server is created" % proc.pid)
+        if int(port) != ProfServer.MAIN_PORT:
+            r = redis.Redis(port=ProfServer.MAIN_PORT)
+            r.hset(port, 'pid', proc.pid)
+        
+        proc.wait()
+        logging.error("[PID %s] is terminated ..." % proc.pid)
         sys.exit(0)
 
     def create_server(self, port):
         portnumber = str(port)
         p = Process(target=self.create_redis_server, args=(portnumber,))
         p.start() 
-        logging.info("[PID %s] Redis server is created" % p.pid)
         
         r = redis.Redis(port=portnumber)
         while True:
@@ -89,7 +96,15 @@ class ProfServer(object):
             
             newredis.bgsave()
             manager['redis'] = newredis
-        
+    
+    def ping_to_redis_db(self, csock, r, name):
+        try:
+            r.ping()
+        except redis.exceptions.ConnectionError:
+            logging.error("[PID %s] %s is dead ..." % (os.getpid(), name))
+            csock = manager['csock']
+            csock.send("%s IS DEAD!" % (name))
+            sys.exit(-1)
 
     def parse_perf_data(self, manager, msg):
         self.update_redis_manager(manager, msg)
@@ -137,23 +152,36 @@ class ProfServer(object):
     def remove_job(self, manager, msg):
         r = manager['mainredis']
         csock = manager['csock']
-        
-        try:
-            r.ping()
-        except redis.exceptions.ConnectionError:
-            logging.error("[PID %s] MAIN port is dead ..." % (os.getpid()))
-            csock = manager['csock']
-            csock.send("MAIN PORT IS DEAD!")
-            sys.exit(-1)
+        self.ping_to_redis_db(csock, r, "MAIN PORT")
 
-        get_keys = r.keys(msg['jobid'])
-        if len(get_keys) != 0:
+        jobID = msg['jobid']
+        if len(r.keys(jobID)) != 0:
+            pid = int(r.hget(jobID, 'pid'))
+            logging.info("[DELETE] Process ID - %s" % pid)
+            os.kill(pid, signal.SIGTERM)
             r.delete(msg['jobid'])
-            csock.send("Delete [JOB %s] successfully!" % msg['jobid'])
+            csock.send("[JOB %s] successfully!" % jobID)
         else:
-            csock.send("Cannot find [JOB %s] Orz...." % msg['jobid'])
+            csock.send("[JOB %s] is NOT in use, delete failed Orz...." % jobID)
             
+    def create_job(self, manager, msg):
+        r = manager['mainredis']
+        csock = manager['csock']
+        self.ping_to_redis_db(csock, r, "MAIN PORT")
         
+        jobID = msg['jobid']
+        if len(r.keys(jobID)) != 0:
+            csock.send("[JOB %s] is in use ..." % jobID)
+            logging.info("[JOB %s] is in use ..." % jobID)
+            sys.exit(-1)
+        else:
+            r.hset(jobID, 'info', msg['info'])
+            r.hset(jobID, 'benchmark', 0)
+            self.create_server(jobID)
+            returninfo = "[JOB %s] is created ..." % jobID
+            r.save()
+            logging.info(returninfo)
+            csock.send(returninfo)
 
     def select_task(self, csock, manager, msg): 
         '''
@@ -164,13 +192,14 @@ class ProfServer(object):
         selector[ProfServer.SEND_PERF_DATA] = self.parse_perf_data
         selector[ProfServer.SEND_BENCHMARK_DATA] = self.parse_benchmark_data
         selector[ProfServer.REMOVE_JOB] = self.remove_job
+        selector[ProfServer.CREATE_JOB] = self.create_job
         
         '''
         Just call selector for specific function
         '''
         idx = msg['command']
         selector[idx](manager, msg)
-
+ 
     def create_task(self, csock, adr):
         mainredis = redis.Redis(port=ProfServer.MAIN_PORT)
         mainredis.bgsave()
@@ -186,7 +215,7 @@ class ProfServer(object):
                 break
             elif len(msg) != 0:
                 csock.send("ack") # send ack back to client
-                print "Client send: " + msg
+                # print "Client send: " + msg
                 msgdict = json.loads(msg)
                 self.select_task(csock, manager, msgdict)
 
