@@ -42,6 +42,18 @@ class CustomClient(ProfClient):
                 logging.error("If you input 'CREATE' command, please input decription. Use --info [INFO] and --jobid [JOB ID]")
                 sys.exit(-1)
         elif command['cmd'] == 'REMOVE':
+            while True:
+                msg = raw_input("Are you sure want to delete all benchmark and profiling data from server? [Yes] [No]  ")
+                if msg.lower() == "Yes".lower():
+                    print("Okay, don't regret")
+                    break
+                elif msg.lower() == "No".lower():
+                    logging.error("Remove fail ...")
+                    sys.exit(-1)
+                else:
+                    print("Please type 'Yes' or 'No'")
+                    pass
+            
             if not command['jobid']:
                 logging.error("If you input 'REMOVE' command, please input decription. Use --jobid [JOB ID]")
                 sys.exit(-1)

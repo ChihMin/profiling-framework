@@ -2,15 +2,16 @@
 
 from multiprocessing import Process
 from subprocess import call
-import socket
-import time
 import os, sys, signal
 import subprocess
-import redis
-import signal
 import argparse
-import json
 import logging
+import socket
+import signal
+import shutil
+import redis
+import time
+import json
 
 class ProfServer(object):
     MAIN_PORT = 2000
@@ -46,7 +47,7 @@ class ProfServer(object):
             r.hset(port, 'pid', proc.pid)
         
         proc.wait()
-        logging.error("[PID %s] is terminated ..." % proc.pid)
+        logging.warning("[PID %s] is terminated, if this is first time to execute server, please killall redis-server" % proc.pid)
         sys.exit(0)
 
     def create_server(self, port):
@@ -149,20 +150,33 @@ class ProfServer(object):
             mainredis.hset(portnumber, bench_counts, benchmark_data)
             mainredis.hset(portnumber, 'benchmark', bench_counts + 1)
     
+    def sync_data_to_db(self, r):
+        while True:
+            try:
+                r.save()
+            except:
+                time.sleep(1)
+                pass
+            else:
+                break
+        
+         
     def remove_job(self, manager, msg):
         r = manager['mainredis']
         csock = manager['csock']
         self.ping_to_redis_db(csock, r, "MAIN PORT")
 
         jobID = msg['jobid']
-        if len(r.keys(jobID)) != 0:
+        if r.exists(jobID):
             pid = int(r.hget(jobID, 'pid'))
-            logging.info("[DELETE] Process ID - %s" % pid)
             os.kill(pid, signal.SIGTERM)
-            r.delete(msg['jobid'])
-            csock.send("[JOB %s] successfully!" % jobID)
+            shutil.rmtree(jobID)
+            r.delete(jobID)
+            self.sync_data_to_db(r)
+            logging.info("[DELETE] Process ID - %s" % pid)
+            csock.send("[JOB %s] Remove successfully!" % jobID)
         else:
-            csock.send("[JOB %s] is NOT in use, delete failed Orz...." % jobID)
+            csock.send("[JOB %s] is NOT in use" % jobID)
             
     def create_job(self, manager, msg):
         r = manager['mainredis']
@@ -174,12 +188,16 @@ class ProfServer(object):
             csock.send("[JOB %s] is in use ..." % jobID)
             logging.info("[JOB %s] is in use ..." % jobID)
             sys.exit(-1)
+        elif int(jobID) <= 2000 or int(jobID) >= 10000:
+            errmsg = "Please choose form 2001 to 9999 as jobID"
+            csock.send(errmsg)
+            sys.exit(-1)
         else:
             r.hset(jobID, 'info', msg['info'])
             r.hset(jobID, 'benchmark', 0)
             self.create_server(jobID)
+            self.sync_data_to_db(r)
             returninfo = "[JOB %s] is created ..." % jobID
-            r.save()
             logging.info(returninfo)
             csock.send(returninfo)
 
