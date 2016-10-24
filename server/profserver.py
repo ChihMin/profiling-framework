@@ -235,6 +235,19 @@ class ProfServer(object):
             ack = csock.recv(1024)
             benchID = benchID + 1
         csock.send("endofmsg")
+    
+    def show_job_profiling(self, manager, msg):
+        csock = manager['csock']
+        jobID = msg['jobid']
+        r = redis.Redis(port=int(jobID))
+        self.ping_to_redis_db(csock, r, "JOB %s" % jobID)
+        
+        nodes = r.keys()
+        for nodename in nodes:
+            returnmsg = json.dumps(r.hgetall(nodename))
+            csock.send(returnmsg + "\n")
+            ack = csock.recv(1024)
+        csock.send("endofmsg")
 
     def select_task(self, csock, manager, msg): 
         '''
@@ -248,6 +261,7 @@ class ProfServer(object):
         selector[ProfServer.CREATE_JOB] = self.create_job
         selector[ProfServer.SHOW_ALL_JOB] = self.show_all_job    
         selector[ProfServer.SHOW_JOB_BENCHMARK] = self.show_job_benchmark
+        selector[ProfServer.SHOW_JOB_PROFILING] = self.show_job_profiling
 
         '''
         Just call selector for specific function

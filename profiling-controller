@@ -73,7 +73,7 @@ class CustomClient(ProfClient):
                 logging.error("'SHOW_JOB_PROFILING' command should input JobID. Use --jobid [JOB ID]")
                 sys.exit(-1)
             elif not command['file']:
-                logging.error("'SHOW_JOB_BENCHMARK' command needs storing to disk, please specific file with --file")
+                logging.error("'SHOW_JOB_PROFILING' command needs storing to disk, please specific file with --file")
                 sys.exit(-1)
         try: 
             self.command['command'] = CustomClient.COMMAND_TABLE[command['cmd']]
@@ -110,7 +110,7 @@ class CustomClient(ProfClient):
             sock.send("ack")
         
         if not self.command['file']:
-            logging.info(message)
+            print(message)
         else:
             f = open(self.command['file'], 'w')
             f.write(message)
