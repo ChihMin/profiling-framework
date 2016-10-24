@@ -206,6 +206,20 @@ class ProfServer(object):
     def show_all_job(self, manager, msg):
         csock = manager['csock']
         r = manager['mainredis']
+        self.ping_to_redis_db(csock, r, "MAIN PORT")
+
+        joblist = r.keys()
+        for jobID in joblist:
+            benchmark_data_number = r.hget(jobID, 'benchmark')
+            information = r.hget(jobID, 'info')
+            
+            returnmsg = "JOBID: %s\t Info: %s\t Number of benchmark data: %s\n" % (
+                jobID, information, benchmark_data_number
+            )
+            csock.send(returnmsg)
+            ack = csock.recv(1024)
+        csock.send("endofmsg")  
+        
 
     def select_task(self, csock, manager, msg): 
         '''
