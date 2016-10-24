@@ -103,8 +103,9 @@ class ProfServer(object):
             r.ping()
         except redis.exceptions.ConnectionError:
             logging.error("[PID %s] %s is dead ..." % (os.getpid(), name))
-            csock = manager['csock']
             csock.send("%s IS DEAD!" % (name))
+            ack = csock.recv(1024)
+            csock.send("endofmsg")
             sys.exit(-1)
 
     def parse_perf_data(self, manager, msg):
