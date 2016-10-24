@@ -171,7 +171,7 @@ class CustomClient(ProfClient):
 
 #### Profiling Client
 
-**NOTICE:** You should ***Create a Job** first before run profiling.  
+**NOTICE:** You should **Create a Job** first before run profiling.  
 
 Profiling client is used to collecting data of each function node, and profiling client currently can be identified by user. Below is parse profiling data example:
 
@@ -205,7 +205,7 @@ Profiling client is used to collecting data of each function node, and profiling
  60         returncode = call(recordcmd, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 ```
 
-Sometimes we cannot actually know where the program location is and we don't have the same profiling tool, in this project we use [perf](http://wiki.csie.ncku.edu.tw/embedded/perf-tutorial) as example.  For example, we just put absolute path to client in line 37 and 38. No matter what, just sending message back to server is enough.
+Sometimes we cannot actually know where the program location is and we don't have the same profiling tool, in this project we use [perf](http://wiki.csie.ncku.edu.tw/embedded/perf-tutorial) as example.  For example, we just put absolute path to executable binary in line 37 and 38. No matter what, just sending message back to server is enough.
 
 Below is `profiling-client` execution method: 
 
