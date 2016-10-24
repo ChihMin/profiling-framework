@@ -147,14 +147,14 @@ class CustomClient(ProfClient):
   	--cmd LIST
   ```
 
-- Dump  benchmark data from server
+- Dump benchmark data from server
 
   ```bash
   profiling-controller \
   	--bind ${HOST_IP_ADDR} \
   	--port ${HOST_PORT} \
   	--jobid ${JOBID} \
-  	--cmd SHOE_JOB_PROFILING \
+  	--cmd SHOW_JOB_BENCHMARK \
   	--file ${OUTPUT_FILE_NAME}
   ```
 
@@ -165,7 +165,7 @@ class CustomClient(ProfClient):
   	--bind ${HOST_IP_ADDR} \
   	--port ${HOST_PORT} \
   	--jobid ${JOBID} \
-  	--cmd SHOE_JOB_BENCHMARK \
+  	--cmd SHOW_JOB_PROFILING \
   	--file ${OUTPUT_FILE_NAME}
   ```
 
