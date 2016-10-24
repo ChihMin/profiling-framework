@@ -14,8 +14,9 @@ parser.add_argument('--bind', help='Server IP address binder, default is localho
 parser.add_argument('--port', help='Server port number, default is 10000') 
 parser.add_argument('--jobid', help='Choose job ID while creating job, jobID range should be from 2001 ~ 9999')
 parser.add_argument('--cmd', help='Profiling Server Command: [CREATE] [REMOVE] [LIST] \
-                                    [SHOW_JOB_INFO] [SHOW_JOB_BENCHMARK]')
+                                    [SHOW_JOB_INFO] [SHOW_JOB_PROFILING] [SHOW_JOB_BENCHMARK]')
 parser.add_argument('--info', help='While creating new job, --info should be specific')
+parser.add_argument('--file', help='[SHOW_JOB_BENCHMARK] [SHOW_JOB_PROFILING] should specific output file')
 args = parser.parse_args()
 
 class CustomClient(ProfClient):
@@ -53,7 +54,6 @@ class CustomClient(ProfClient):
                 else:
                     print("Please type 'Yes' or 'No'")
                     pass
-            
             if not command['jobid']:
                 logging.error("If you input 'REMOVE' command, please input decription. Use --jobid [JOB ID]")
                 sys.exit(-1)
@@ -65,9 +65,15 @@ class CustomClient(ProfClient):
             if not command['jobid']:
                 logging.error("'SHOW_JOB_BENCHMARK' command should input JobID. Use --jobid [JOB ID]")
                 sys.exit(-1)
+            elif not command['file']:
+                logging.error("'SHOW_JOB_BENCHMARK' command needs storing to disk, please specific file with --file")
+                sys.exit(-1)
         elif command['cmd'] == 'SHOW_JOB_PROFILING':
             if not command['jobid']:
                 logging.error("'SHOW_JOB_PROFILING' command should input JobID. Use --jobid [JOB ID]")
+                sys.exit(-1)
+            elif not command['file']:
+                logging.error("'SHOW_JOB_BENCHMARK' command needs storing to disk, please specific file with --file")
                 sys.exit(-1)
         try: 
             self.command['command'] = CustomClient.COMMAND_TABLE[command['cmd']]
@@ -102,7 +108,13 @@ class CustomClient(ProfClient):
                 break
             message += returnmsg
             sock.send("ack")
-        logging.info(message)
+        
+        if not self.command['file']:
+            logging.info(message)
+        else:
+            f = open(self.command['file'], 'w')
+            f.write(message)
+            f.close()
         sock.close()
 
 def main():
@@ -119,6 +131,7 @@ def main():
     command['cmd'] = args.cmd
     command['info'] = args.info
     command['jobid'] = args.jobid
+    command['file'] = args.file
     
     profclient = CustomClient(bindaddr, portnumber, command)
     profclient.run()    

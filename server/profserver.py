@@ -219,7 +219,22 @@ class ProfServer(object):
             csock.send(returnmsg)
             ack = csock.recv(1024)
         csock.send("endofmsg")  
+    
+    def show_job_benchmark(self, manager, msg):
+        csock = manager['csock']
+        r = manager['mainredis']
+        self.ping_to_redis_db(csock, r, "MAIN PORT")
         
+        jobID = msg['jobid']
+        benchID = 0
+        while True:
+            benchmark_data = r.hget(jobID, benchID)
+            if not benchmark_data:
+                break
+            csock.send(benchmark_data + "\n")
+            ack = csock.recv(1024)
+            benchID = benchID + 1
+        csock.send("endofmsg")
 
     def select_task(self, csock, manager, msg): 
         '''
@@ -232,6 +247,7 @@ class ProfServer(object):
         selector[ProfServer.REMOVE_JOB] = self.remove_job
         selector[ProfServer.CREATE_JOB] = self.create_job
         selector[ProfServer.SHOW_ALL_JOB] = self.show_all_job    
+        selector[ProfServer.SHOW_JOB_BENCHMARK] = self.show_job_benchmark
 
         '''
         Just call selector for specific function
