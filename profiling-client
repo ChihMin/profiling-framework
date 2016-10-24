@@ -36,7 +36,7 @@ class CustomClient(ProfClient):
         eventlist = ['cache-misses:u', 'branch-misses:u', 'cpu-cycles:u']
         program = "/home/chihmin/llvm-develop/llvm/build/bin/clang++"
 
-        f = open("/home/chihmin/llvm-develop/llvm/build/test.log", "r")
+        f = open("/home/chihmin/llvm-develop/llvm/build/clang++.log", "r")
         while True:
             str = f.readline()
             if not str:

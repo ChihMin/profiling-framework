@@ -244,7 +244,8 @@ class ProfServer(object):
         
         nodes = r.keys()
         for nodename in nodes:
-            returnmsg = json.dumps(r.hgetall(nodename))
+            table = dict()
+            returnmsg = json.dumps({nodename: r.hgetall(nodename)})
             csock.send(returnmsg + "\n")
             ack = csock.recv(1024)
         csock.send("endofmsg")
