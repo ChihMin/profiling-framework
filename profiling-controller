@@ -91,10 +91,19 @@ class CustomClient(ProfClient):
             if self.command[key] is None:
                 self.command[key] = "null"
         """
-
+        
+        message = str()
         self.send_data(sock, [self.command])
-        returnmsg = sock.recv(1024)
-        logging.info(returnmsg)
+        while True:
+            returnmsg = sock.recv(1024)
+            if not returnmsg:
+                break
+            elif returnmsg == "endofmsg":
+                break
+            message += returnmsg
+            sock.send("ack")
+        logging.info(message)
+        sock.close()
 
 def main():
     portnumber = 10000

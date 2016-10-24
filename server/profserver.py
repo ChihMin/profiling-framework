@@ -177,6 +177,8 @@ class ProfServer(object):
             csock.send("[JOB %s] Remove successfully!" % jobID)
         else:
             csock.send("[JOB %s] is NOT in use" % jobID)
+        ack = csock.recv(1024)
+        csock.send("endofmsg")
             
     def create_job(self, manager, msg):
         r = manager['mainredis']
@@ -185,13 +187,11 @@ class ProfServer(object):
         
         jobID = msg['jobid']
         if len(r.keys(jobID)) != 0:
-            csock.send("[JOB %s] is in use ..." % jobID)
+            csock.send("[JOB %s] is in use ...\n" % jobID)
             logging.info("[JOB %s] is in use ..." % jobID)
-            sys.exit(-1)
         elif int(jobID) <= 2000 or int(jobID) >= 10000:
             errmsg = "Please choose form 2001 to 9999 as jobID"
             csock.send(errmsg)
-            sys.exit(-1)
         else:
             r.hset(jobID, 'info', msg['info'])
             r.hset(jobID, 'benchmark', 0)
@@ -200,6 +200,12 @@ class ProfServer(object):
             returninfo = "[JOB %s] is created ..." % jobID
             logging.info(returninfo)
             csock.send(returninfo)
+        ack = csock.recv(1024)
+        csock.send("endofmsg")
+
+    def show_all_job(self, manager, msg):
+        csock = manager['csock']
+        r = manager['mainredis']
 
     def select_task(self, csock, manager, msg): 
         '''
@@ -211,7 +217,8 @@ class ProfServer(object):
         selector[ProfServer.SEND_BENCHMARK_DATA] = self.parse_benchmark_data
         selector[ProfServer.REMOVE_JOB] = self.remove_job
         selector[ProfServer.CREATE_JOB] = self.create_job
-        
+        selector[ProfServer.SHOW_ALL_JOB] = self.show_all_job    
+
         '''
         Just call selector for specific function
         '''
