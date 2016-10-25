@@ -25,6 +25,7 @@ class ProfClient(object):
     SHOW_JOB_INFO = 6
     SHOW_JOB_BENCHMARK = 7
     SHOW_JOB_PROFILING = 8
+    CLEAR_JOB_BENCHMARK = 9
      
     def __init__(self, bindaddr, port):
         self.bindaddr = bindaddr

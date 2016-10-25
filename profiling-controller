@@ -26,7 +26,8 @@ class CustomClient(ProfClient):
         "LIST": ProfClient.SHOW_ALL_JOB,
         "SHOW_JOB_INFO": ProfClient.SHOW_JOB_INFO,
         "SHOW_JOB_BENCHMARK": ProfClient.SHOW_JOB_BENCHMARK,
-        "SHOW_JOB_PROFILING": ProfClient.SHOW_JOB_PROFILING
+        "SHOW_JOB_PROFILING": ProfClient.SHOW_JOB_PROFILING,
+        "CLEAR_JOB_BENCHMARK": ProfClient.CLEAR_JOB_BENCHMARK
     }
 
     def __init__(self, bindaddr, port, command):
@@ -61,6 +62,10 @@ class CustomClient(ProfClient):
             if not command['jobid']:
                 logging.error("'SHOW_JOB_INFO' command should input JobID. Use --jobid [JOB ID]")
                 sys.exit(-1)
+        elif command['cmd'] == 'CLEAR_JOB_BENCHMARK':
+            if not command['jobid']:
+                logging.error("'CLEAR_JOB_BENCHMARK' command should input JobID. Use --jobid [JOB ID]")
+                sys.exit(-1)
         elif command['cmd'] == 'SHOW_JOB_BENCHMARK':
             if not command['jobid']:
                 logging.error("'SHOW_JOB_BENCHMARK' command should input JobID. Use --jobid [JOB ID]")
@@ -75,6 +80,7 @@ class CustomClient(ProfClient):
             elif not command['file']:
                 logging.error("'SHOW_JOB_PROFILING' command needs storing to disk, please specific file with --file")
                 sys.exit(-1)
+        
         try: 
             self.command['command'] = CustomClient.COMMAND_TABLE[command['cmd']]
         except KeyError:

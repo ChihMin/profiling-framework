@@ -27,7 +27,8 @@ class ProfServer(object):
     SHOW_JOB_INFO = 6
     SHOW_JOB_BENCHMARK = 7
     SHOW_JOB_PROFILING = 8
-    
+    CLEAR_JOB_BENCHMARK = 9
+
     def __init__(self, bindaddr, portnumber):
         self.bindaddr = bindaddr
         self.portnumber = portnumber
@@ -236,7 +237,7 @@ class ProfServer(object):
             ack = csock.recv(1024)
             benchID = benchID + 1
         csock.send("endofmsg")
-    
+     
     def show_job_profiling(self, manager, msg):
         csock = manager['csock']
         jobID = msg['jobid']
@@ -249,6 +250,25 @@ class ProfServer(object):
             returnmsg = json.dumps({nodename: r.hgetall(nodename)})
             csock.send(returnmsg + "\n")
             ack = csock.recv(1024)
+        csock.send("endofmsg")
+    
+    def clear_job_benchmark(self, manager, msg):
+        csock = manager['csock']
+        jobID = msg['jobid']
+        r = redis.Redis(port=ProfServer.MAIN_PORT)
+        self.ping_to_redis_db(csock, r, "MAIN PORT")
+        
+        benchID = 0
+        while True:
+            if not r.hexists(jobID, benchID):
+                break
+            else:
+                r.hdel(jobID, benchID)
+            benchID = benchID + 1
+        r.hset(jobID, 'benchmark', 0)
+        self.sync_data_to_db(r)
+        csock.send("[Job %s] Clear all benchmark data ...\n")
+        ack = csock.recv(1024)
         csock.send("endofmsg")
 
     def select_task(self, csock, manager, msg): 
@@ -264,7 +284,7 @@ class ProfServer(object):
         selector[ProfServer.SHOW_ALL_JOB] = self.show_all_job    
         selector[ProfServer.SHOW_JOB_BENCHMARK] = self.show_job_benchmark
         selector[ProfServer.SHOW_JOB_PROFILING] = self.show_job_profiling
-
+        selector[ProfServer.CLEAR_JOB_BENCHMARK] = self.clear_job_benchmark
         '''
         Just call selector for specific function
         '''
