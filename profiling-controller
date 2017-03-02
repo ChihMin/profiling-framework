@@ -115,6 +115,16 @@ class CustomClient(ProfClient):
             message += returnmsg
             sock.send("ack")
         
+        if self.command['cmd'] == 'LIST':
+            strarray = message.split("\n")
+            if strarray[-1] == '':
+                strarray.pop()
+            
+            message = ''
+            strarray.sort(self.sortmsg)
+            for msg in strarray:
+                message += "%s\n" % (msg) 
+                 
         if not self.command['file']:
             print(message)
         else:
@@ -122,6 +132,12 @@ class CustomClient(ProfClient):
             f.write(message)
             f.close()
         sock.close()
+   
+    def sortmsg(self, a, b):
+        if int(a.split()[1]) > int(b.split()[1]):
+            return 1
+        else:
+            return -1
 
 def main():
     portnumber = 10000
